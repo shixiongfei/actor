@@ -137,15 +137,18 @@ static actor_t *actor_current(void) {
 }
 
 static actor_t *actor_query(actorid_t actor_id) {
-  actor_t *actor;
+  actor_t *finder, *actor = NULL;
   list_t *p, *t;
 
   mutex_lock(&actor_mutex);
 
   list_foreach(&actor_list, p, t) {
-    actor = list_entry(p, actor_t, actor_node);
-    if (actor_id == actor->actor_id)
+    finder = list_entry(p, actor_t, actor_node);
+
+    if (actor_id == finder->actor_id) {
+      actor = finder;
       break;
+    }
   }
 
   mutex_unlock(&actor_mutex);
@@ -155,7 +158,10 @@ static actor_t *actor_query(actorid_t actor_id) {
 
 void actor_wrap(void (*func)(void *), void *arg) {
   actor_t *actor = actor_current();
+
   func(arg);
+
+  tls_setvalue(tls, NULL);
   actor_destroy(actor);
 }
 
@@ -166,7 +172,7 @@ static void actor_thread(void *arg) {
 }
 
 actorid_t actor_spawn(void (*func)(void *), void *arg) {
-  actorid_t actor_id;
+  actorid_t actor_id = 0;
   actorwrap_t *wrap;
   thread_t thread;
 
@@ -278,7 +284,6 @@ int actor_reply(actormsg_t *msg, int type, const void *data, int size) {
 }
 
 int actor_broadcast(int type, const void *data, int size) {
-
   actor_t *actor;
   list_t *p, *t;
   int counter = 0;
