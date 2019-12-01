@@ -45,12 +45,10 @@ solution ( "actor" )
     defines { "WIN32", "_WIN32", "_WINDOWS",
               "_CRT_SECURE_NO_WARNINGS", "_CRT_SECURE_NO_DEPRECATE",
               "_CRT_NONSTDC_NO_DEPRECATE", "_WINSOCK_DEPRECATED_NO_WARNINGS" }
-    links { "Ws2_32", "IPHLPAPI" }
 
   configuration ( "gmake" )
     warnings  "Default" --"Extra"
     defines { "LINUX_OR_MACOSX" }
-    links { }
 
   configuration { "gmake", "macosx" }
     defines { "__APPLE__", "__MACH__", "__MRC__", "macintosh" }
