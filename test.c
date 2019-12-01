@@ -31,7 +31,7 @@ static void actor_ping(void *arg) {
            (const char *)msg.data, msg.sender);
   }
 
-  actor_reply(&cmd, cmd.type, "FINISHED", 8);
+  actor_reply(&cmd, cmd.type, "FINISHED", 9);
 }
 
 static void actor_pong(void *arg) {
@@ -54,12 +54,14 @@ static void actor_main(void *arg) {
 
   printf("Actor Main ID: %ld\n", actor_self());
 
-  actor_send(ping, -1, "START", 5);
+  actor_send(ping, -1, "START", 6);
   actor_receive(&msg, 0x7fffffff);
 }
 
 int main(int argc, char *argv[]) {
   actor_initialize();
+
+  printf("CPU Nums: %d\n",actor_cpunum());
 
   ping = actor_spawn(actor_ping, NULL);
   pong = actor_spawn(actor_pong, NULL);

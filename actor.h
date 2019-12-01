@@ -68,13 +68,19 @@ ACTOR_API void actor_finalize(void);
 
 ACTOR_API void actor_wrap(void (*func)(void *), void *arg);
 ACTOR_API actorid_t actor_spawn(void (*func)(void *), void *arg);
+
+/* Return: -1 Failed. 0 Timedout. 1 Success. */
 ACTOR_API int actor_receive(actormsg_t *actor_msg, unsigned int timeout);
 ACTOR_API int actor_send(actorid_t actor_id, int type, const void *data,
                          int size);
 ACTOR_API int actor_reply(actormsg_t *msg, int type, const void *data,
                           int size);
 ACTOR_API int actor_broadcast(int type, const void *data, int size);
+
 ACTOR_API actorid_t actor_self(void);
+
+/* Please call garbage collect regularly to clean up the actor memory. */
+ACTOR_API void actor_garbagecollect(void);
 
 #ifdef __cplusplus
 };

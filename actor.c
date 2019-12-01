@@ -39,7 +39,7 @@ typedef struct actor_s {
 
   list_t actor_node;
   list_t inbox;
-  mailmsg_t *trash;
+  list_t trash;
 
   mutex_t mutex;
   cond_t wait_cond;
@@ -55,15 +55,6 @@ void actor_initialize(void) {
   mutex_create(&actor_mutex);
 }
 
-void actor_finalize(void) {
-  mutex_lock(&actor_mutex);
-  /* TODO: clear actor list */
-  mutex_unlock(&actor_mutex);
-
-  mutex_destroy(&actor_mutex);
-  tls_destroy(tls);
-}
-
 static actor_t *actor_create(void) {
   actor_t *actor = (actor_t *)actor_malloc(sizeof(actor_t));
 
@@ -74,6 +65,7 @@ static actor_t *actor_create(void) {
 
   list_init(&actor->actor_node);
   list_init(&actor->inbox);
+  list_init(&actor->trash);
 
   mutex_create(&actor->mutex);
   cond_create(&actor->wait_cond);
@@ -101,8 +93,11 @@ static void actor_destroy(actor_t *actor) {
 
   mutex_lock(&actor->mutex);
 
-  if (actor->trash)
-    actor_free(actor->trash);
+  while (!list_isempty(&actor->trash)) {
+    p = list_shift(&actor->trash);
+    msg = list_entry(p, mailmsg_t, mail_node);
+    actor_free(msg);
+  }
 
   while (!list_isempty(&actor->inbox)) {
     p = list_shift(&actor->inbox);
@@ -116,6 +111,23 @@ static void actor_destroy(actor_t *actor) {
   mutex_destroy(&actor->mutex);
 
   actor_free(actor);
+}
+
+void actor_finalize(void) {
+  actor_t *actor;
+  list_t *p, *t;
+
+  mutex_lock(&actor_mutex);
+
+  list_foreach(&actor_list, p, t) {
+    actor = list_entry(p, actor_t, actor_node);
+    actor_destroy(actor);
+  }
+
+  mutex_unlock(&actor_mutex);
+
+  mutex_destroy(&actor_mutex);
+  tls_destroy(tls);
 }
 
 #define actor_tryget() ((actor_t *)tls_getvalue(tls))
@@ -201,11 +213,6 @@ int actor_receive(actormsg_t *actor_msg, unsigned int timeout) {
 
   mutex_lock(&actor->mutex);
 
-  if (actor->trash) {
-    actor_free(actor->trash);
-    actor->trash = NULL;
-  }
-
   if (list_isempty(&actor->inbox)) {
     actor->waiting += 1;
     retval = cond_timedwait(&actor->wait_cond, &actor->mutex, timeout);
@@ -223,7 +230,7 @@ int actor_receive(actormsg_t *actor_msg, unsigned int timeout) {
   if (actor_msg)
     *actor_msg = msg->actor_msg;
 
-  actor->trash = msg;
+  list_push(&actor->trash, &msg->mail_node);
 
   mutex_unlock(&actor->mutex);
 
@@ -309,4 +316,23 @@ actorid_t actor_self(void) {
     return -1;
 
   return actor->actor_id;
+}
+
+void actor_garbagecollect(void) {
+  actor_t *actor = actor_tryget();
+  mailmsg_t *msg;
+  list_t *p;
+
+  if (!actor)
+    return;
+
+  mutex_lock(&actor->mutex);
+
+  while (!list_isempty(&actor->trash)) {
+    p = list_shift(&actor->trash);
+    msg = list_entry(p, mailmsg_t, mail_node);
+    actor_free(msg);
+  }
+
+  mutex_unlock(&actor->mutex);
 }
