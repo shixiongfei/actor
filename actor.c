@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include "internal.h"
+#include "list.h"
 
 allocator_t allocator = {malloc, free};
 
