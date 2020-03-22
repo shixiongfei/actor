@@ -54,8 +54,7 @@ int list_length(list_t *list);
 #define list_last(l) list_head(l)
 #define list_prev(n) list_head(n)
 #define list_next(n) list_tail(n)
-#define list_isempty(l)                                                        \
-  (((l) == list_head(l)) && (list_head(l) == list_tail(l)))
+#define list_empty(l) (((l) == list_head(l)) && (list_head(l) == list_tail(l)))
 
 #define list_foreach(l, p, t)                                                  \
   for ((p) = list_first(l), (t) = list_next(p); (l) != (p);                    \

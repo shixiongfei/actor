@@ -104,13 +104,13 @@ static void actor_destroy(actor_t *actor) {
 
   mutex_lock(&actor->mutex);
 
-  while (!list_isempty(&actor->trash)) {
+  while (!list_empty(&actor->trash)) {
     p = list_shift(&actor->trash);
     msg = list_entry(p, mailmsg_t, mail_node);
     actor_free(msg);
   }
 
-  while (!list_isempty(&actor->inbox)) {
+  while (!list_empty(&actor->inbox)) {
     p = list_shift(&actor->inbox);
     msg = list_entry(p, mailmsg_t, mail_node);
     actor_free(msg);
@@ -224,7 +224,7 @@ int actor_receive(actormsg_t *actor_msg, unsigned int timeout) {
 
   mutex_lock(&actor->mutex);
 
-  if (list_isempty(&actor->inbox)) {
+  if (list_empty(&actor->inbox)) {
     actor->waiting += 1;
     retval = cond_timedwait(&actor->wait_cond, &actor->mutex, timeout);
     actor->waiting -= 1;
@@ -339,7 +339,7 @@ void actor_garbagecollect(void) {
 
   mutex_lock(&actor->mutex);
 
-  while (!list_isempty(&actor->trash)) {
+  while (!list_empty(&actor->trash)) {
     p = list_shift(&actor->trash);
     msg = list_entry(p, mailmsg_t, mail_node);
     actor_free(msg);
