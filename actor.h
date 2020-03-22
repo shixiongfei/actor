@@ -1,7 +1,7 @@
 /*
  *  actor.h
  *
- *  copyright (c) 2019 Xiongfei Shi
+ *  copyright (c) 2019, 2020 Xiongfei Shi
  *
  *  author: Xiongfei Shi <jenson.shixf(a)gmail.com>
  *  license: Apache-2.0
@@ -63,6 +63,7 @@ ACTOR_API void actor_setalloc(void *(*alloc)(size_t), void (*release)(void *));
 
 ACTOR_API int actor_cpunum(void);
 ACTOR_API int actor_gettid(void);
+ACTOR_API int actor_getpid(void);
 
 ACTOR_API void actor_initialize(void);
 ACTOR_API void actor_finalize(void);

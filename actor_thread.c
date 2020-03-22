@@ -229,6 +229,12 @@ int actor_cpunum(void) {
 }
 #endif
 
+#ifndef _WIN32
+int actor_getpid(void) { return (int)getpid(); }
+#else
+int actor_getpid(void) { return _getpid(); }
+#endif
+
 int actor_gettid(void) { return gettid(); }
 
 typedef struct cthread_s {
