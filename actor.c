@@ -1,7 +1,7 @@
 /*
  *  actor.c
  *
- *  copyright (c) 2019 Xiongfei Shi
+ *  copyright (c) 2019, 2020 Xiongfei Shi
  *
  *  author: Xiongfei Shi <jenson.shixf(a)gmail.com>
  *  license: Apache-2.0
@@ -12,15 +12,25 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "internal.h"
+#include "actor.h"
 #include "list.h"
+#include "threads.h"
 
-allocator_t allocator = {malloc, free};
-
-void actor_setalloc(void *(*alloc)(size_t), void (*release)(void *)) {
-  allocator.alloc = alloc ? alloc : malloc;
-  allocator.release = release ? release : free;
+static void *alloc_emul(void *ptr, size_t size) {
+  if (size)
+    return realloc(ptr, size);
+  free(ptr);
+  return NULL;
 }
+
+static void *(*actor_alloc)(void *, size_t) = alloc_emul;
+
+void actor_setalloc(void *(*allocator)(void *, size_t)) {
+  actor_alloc = allocator ? allocator : alloc_emul;
+}
+
+void *actor_malloc(size_t size) { return actor_alloc(NULL, size); }
+void actor_free(void *ptr) { actor_alloc(ptr, 0); }
 
 typedef struct mailmsg_s {
   actormsg_t actor_msg;

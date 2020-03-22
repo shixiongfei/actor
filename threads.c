@@ -1,7 +1,7 @@
 /*
- *  actor_thread.c
+ *  threads.c
  *
- *  copyright (c) 2019 Xiongfei Shi
+ *  copyright (c) 2019, 2020 Xiongfei Shi
  *
  *  author: Xiongfei Shi <jenson.shixf(a)gmail.com>
  *  license: Apache2.0
@@ -27,7 +27,7 @@
 #include <process.h>
 #endif /* _WIN32 */
 
-#include "internal.h"
+#include "threads.h"
 
 #ifndef _WIN32
 int mutex_create(mutex_t *mtx) {

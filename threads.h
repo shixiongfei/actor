@@ -1,7 +1,7 @@
 /*
- *  internal.h
+ *  threads.h
  *
- *  copyright (c) 2019 Xiongfei Shi
+ *  copyright (c) 2019, 2020 Xiongfei Shi
  *
  *  author: Xiongfei Shi <jenson.shixf(a)gmail.com>
  *  license: Apache-2.0
@@ -9,8 +9,8 @@
  *  https://github.com/shixiongfei/actor
  */
 
-#ifndef __INTERNAL_H__
-#define __INTERNAL_H__
+#ifndef __THREADS_H__
+#define __THREADS_H__
 
 #ifndef _WIN32
 #include <pthread.h>
@@ -18,21 +18,9 @@
 #include <Windows.h>
 #endif
 
-#include "actor.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-typedef struct allocator_s {
-  void *(*alloc)(size_t);
-  void (*release)(void *);
-} allocator_t;
-
-extern allocator_t allocator;
-
-#define actor_malloc(size) allocator.alloc(size)
-#define actor_free(ptr) allocator.release(ptr)
 
 #ifdef _MSC_VER
 #define THREAD_LOCAL __declspec(thread)
@@ -106,4 +94,4 @@ int thread_kill(thread_t *thread);
 };
 #endif
 
-#endif /* __INTERNAL_H__ */
+#endif /* __THREADS_H__ */
