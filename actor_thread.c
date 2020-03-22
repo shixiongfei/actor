@@ -15,6 +15,7 @@
 
 #ifndef _WIN32
 #include <errno.h>
+#include <signal.h>
 #include <sys/time.h>
 #include <unistd.h>
 
@@ -182,36 +183,9 @@ void *tls_getvalue(tls_t tls) { return TlsGetValue(tls); }
 
 #define DECLARE_THREAD_CB(nm, arg) static void *nm(void *arg)
 #define THREAD_CODE(x) ((void *)((intptr_t)(x)))
+
+static void thread_killer(int sig) { pthread_exit(NULL); }
 #else
-typedef unsigned int pthread_attr_t;
-#define PTHREAD_CREATE_DETACHED 0
-#define PTHREAD_CREATE_JOINABLE 0
-#define PTHREAD_CANCEL_ASYNCHRONOUS 0
-#define PTHREAD_CANCEL_ENABLE 0
-#define pthread_attr_init(t) ((*(t)) = 0)
-#define pthread_attr_setdetachstate(a, b)                                      \
-  do {                                                                         \
-    ((void *)(a));                                                             \
-    ((void *)(b));                                                             \
-  } while (0)
-#define pthread_attr_setstacksize(t, s) ((*(t)) = (s))
-#define pthread_attr_destroy(t)                                                \
-  do {                                                                         \
-    ((void *)(t));                                                             \
-  } while (0)
-#define pthread_setcancelstate(a, b)                                           \
-  do {                                                                         \
-    ((void *)(a));                                                             \
-    ((void *)(b));                                                             \
-  } while (0)
-#define pthread_setcanceltype(a, b)                                            \
-  do {                                                                         \
-    ((void *)(a));                                                             \
-    ((void *)(b));                                                             \
-  } while (0)
-#define pthread_testcancel()                                                   \
-  do {                                                                         \
-  } while (0)
 #define pthread_exit(n) _endthreadex(n)
 #define pthread_create(h, a, f, p)                                             \
   ((HANDLE)-1 == ((*h) = (HANDLE)_beginthreadex(NULL, (a), (f), (p), 0, NULL)) \
@@ -234,7 +208,9 @@ static int pthread_join(pthread_t h, void **retval) {
 
 static int pthread_detach(pthread_t h) { return CloseHandle(h) ? 0 : -1; }
 
-static int pthread_cancel(pthread_t h) {
+#define SIGUSR1 0
+
+static int pthread_kill(pthread_t h, int sig) {
   return TerminateThread(h, 0) ? 0 : -1;
 }
 
@@ -253,7 +229,7 @@ int actor_cpunum(void) {
 }
 #endif
 
-int thread_gettid(void) { return gettid(); }
+int actor_gettid(void) { return gettid(); }
 
 typedef struct cthread_s {
   int tid;
@@ -263,13 +239,18 @@ typedef struct cthread_s {
 
 DECLARE_THREAD_CB(cthread_entry, param) {
   cthread_t ctx = *(cthread_t *)param;
-  int oldType = 0, oldState = 0;
 
-  pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, &oldType);
-  pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldState);
-  pthread_testcancel();
+#ifndef _WIN32
+  struct sigaction act;
 
-  atom_set(&((cthread_t *)param)->tid, thread_gettid());
+  sigemptyset(&act.sa_mask);
+  act.sa_flags = 0;
+  act.sa_handler = thread_killer;
+
+  sigaction(SIGUSR1, &act, NULL);
+#endif
+
+  atom_set(&((cthread_t *)param)->tid, actor_gettid());
   ctx.func(ctx.arg);
 
   return THREAD_CODE(0);
@@ -299,5 +280,5 @@ int thread_detach(thread_t *thread) {
 }
 
 int thread_kill(thread_t *thread) {
-  return (0 == pthread_cancel(*thread)) ? 0 : -1;
+  return (0 == pthread_kill(*thread, SIGUSR1)) ? 0 : -1;
 }

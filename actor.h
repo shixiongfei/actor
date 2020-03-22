@@ -62,6 +62,7 @@ typedef struct actormsg_s {
 ACTOR_API void actor_setalloc(void *(*alloc)(size_t), void (*release)(void *));
 
 ACTOR_API int actor_cpunum(void);
+ACTOR_API int actor_gettid(void);
 
 ACTOR_API void actor_initialize(void);
 ACTOR_API void actor_finalize(void);

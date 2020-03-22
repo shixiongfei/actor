@@ -140,7 +140,7 @@ static actor_t *actor_current(void) {
     actor = actor_create();
 
     if (actor) {
-      atom_set(&actor->actor_id, thread_gettid());
+      atom_set(&actor->actor_id, actor_gettid());
       tls_setvalue(tls, actor);
       actor_push(actor);
     }

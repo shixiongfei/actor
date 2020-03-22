@@ -97,8 +97,6 @@ void tls_destroy(tls_t tls);
 int tls_setvalue(tls_t tls, void *val);
 void *tls_getvalue(tls_t tls);
 
-int thread_gettid(void);
-
 int thread_start(thread_t *thread, void (*func)(void *), void *arg);
 int thread_join(thread_t *thread);
 int thread_detach(thread_t *thread);
