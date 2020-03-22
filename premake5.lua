@@ -24,9 +24,7 @@ solution ( "actor" )
   kind ( "SharedLib" )
   language ( "C" )
   targetname ("actor")
-  includedirs { "./list" }
-  files { "./*.h", "./*.c",
-          "./list/list.h", "./list/list.c" }
+  files { "./*.h", "./*.c" }
   excludes { "./test.c" }
   defines { "_UNICODE", "ACTOR_BUILD_DLL" }
   staticruntime "On"
