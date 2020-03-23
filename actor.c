@@ -29,8 +29,8 @@ void actor_setalloc(void *(*allocator)(void *, size_t)) {
   actor_alloc = allocator ? allocator : alloc_emul;
 }
 
-void *actor_malloc(size_t size) { return actor_alloc(NULL, size); }
-void actor_free(void *ptr) { actor_alloc(ptr, 0); }
+#define actor_malloc(size) actor_alloc(NULL, size)
+#define actor_free(ptr) actor_alloc(ptr, 0)
 
 typedef struct mailmsg_s {
   actormsg_t actor_msg;
