@@ -16,6 +16,8 @@
 #include "list.h"
 #include "threads.h"
 
+#define ACTOR_MAXMSG 1234567
+
 static void *alloc_emul(void *ptr, size_t size) {
   if (size)
     return realloc(ptr, size);
@@ -46,14 +48,18 @@ typedef struct actorwrap_s {
 typedef struct actor_s {
   actorid_t actor_id;
 
-  int waiting;
-
   list_t actor_node;
   list_t inbox;
   list_t trash;
 
+  int msgsize;
+  int maxsize;
+
+  int r_waiting;
+  int w_waiting;
+  cond_t r_cond;
+  cond_t w_cond;
   mutex_t mutex;
-  cond_t wait_cond;
 } actor_t;
 
 static tls_t tls;
@@ -79,7 +85,10 @@ static actor_t *actor_create(void) {
   list_init(&actor->trash);
 
   mutex_create(&actor->mutex);
-  cond_create(&actor->wait_cond);
+  cond_create(&actor->r_cond);
+  cond_create(&actor->w_cond);
+
+  actor->maxsize = ACTOR_MAXMSG;
 
   return actor;
 }
@@ -118,7 +127,8 @@ static void actor_destroy(actor_t *actor) {
 
   mutex_unlock(&actor->mutex);
 
-  cond_destroy(&actor->wait_cond);
+  cond_destroy(&actor->w_cond);
+  cond_destroy(&actor->r_cond);
   mutex_destroy(&actor->mutex);
 
   actor_free(actor);
@@ -224,10 +234,10 @@ int actor_receive(actormsg_t *actor_msg, unsigned int timeout) {
 
   mutex_lock(&actor->mutex);
 
-  if (list_empty(&actor->inbox)) {
-    actor->waiting += 1;
-    retval = cond_timedwait(&actor->wait_cond, &actor->mutex, timeout);
-    actor->waiting -= 1;
+  while (list_empty(&actor->inbox)) {
+    actor->r_waiting += 1;
+    retval = cond_timedwait(&actor->r_cond, &actor->mutex, timeout);
+    actor->r_waiting -= 1;
 
     if (retval < 1) {
       mutex_unlock(&actor->mutex);
@@ -236,12 +246,17 @@ int actor_receive(actormsg_t *actor_msg, unsigned int timeout) {
   }
 
   node = list_shift(&actor->inbox);
+  actor->msgsize -= 1;
+
   msg = list_entry(node, mailmsg_t, mail_node);
 
   if (actor_msg)
     *actor_msg = msg->actor_msg;
 
   list_push(&actor->trash, &msg->mail_node);
+
+  if (actor->w_waiting > 0)
+    cond_signal(&actor->w_cond);
 
   mutex_unlock(&actor->mutex);
 
@@ -272,10 +287,17 @@ static int actor_sendto(actor_t *actor, int type, const void *data, int size) {
 
   mutex_lock(&actor->mutex);
 
-  list_push(&actor->inbox, &msg->mail_node);
+  while (actor->msgsize == actor->maxsize) {
+    actor->w_waiting += 1;
+    cond_wait(&actor->w_cond, &actor->mutex);
+    actor->w_waiting -= 1;
+  }
 
-  if (actor->waiting > 0)
-    cond_signal(&actor->wait_cond);
+  list_push(&actor->inbox, &msg->mail_node);
+  actor->msgsize += 1;
+
+  if (actor->r_waiting > 0)
+    cond_signal(&actor->r_cond);
 
   mutex_unlock(&actor->mutex);
 
