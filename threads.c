@@ -27,6 +27,7 @@
 #include <process.h>
 #endif /* _WIN32 */
 
+#include "actor.h"
 #include "threads.h"
 
 #ifndef _WIN32
