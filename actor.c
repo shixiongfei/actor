@@ -41,16 +41,22 @@ typedef struct mailmsg_s {
 } mailmsg_t;
 
 typedef struct actorwrap_s {
+  int copied;
   void (*func)(void *);
   void *arg;
 } actorwrap_t;
 
 typedef struct actor_s {
   actorid_t actor_id;
+  actorwrap_t wrap;
 
   list_t actor_node;
-  list_t inbox;
   list_t trash;
+  list_t inbox[ACTOR_PRIORITIES];
+
+  int payload[ACTOR_PRIORITIES];
+  int stack[ACTOR_PRIORITIES];
+  int stack_top;
 
   int msgsize;
   int maxsize;
@@ -66,6 +72,43 @@ static tls_t tls;
 static list_t actor_list;
 static mutex_t actor_mutex;
 
+static int qstack_top(actor_t *actor) {
+  if (actor->stack_top < 0)
+    return -1;
+
+  if (actor->stack_top >= ACTOR_PRIORITIES)
+    return -1;
+
+  return actor->stack[actor->stack_top];
+}
+
+static int qstack_push(actor_t *actor, int priority) {
+  int top;
+
+  if (priority < ACTOR_HIGH || priority > ACTOR_LOW)
+    return -1;
+
+  if (actor->stack_top + 1 >= ACTOR_PRIORITIES)
+    return -1;
+
+  top = qstack_top(actor);
+  actor->stack[++actor->stack_top] = priority;
+
+  return top;
+}
+
+static int qstack_pop(actor_t *actor) {
+  int top;
+
+  if (actor->stack_top < 0)
+    return -1;
+
+  top = qstack_top(actor);
+  actor->stack[actor->stack_top--] = -1;
+
+  return top;
+}
+
 void actor_initialize(void) {
   tls_create(&tls);
   list_init(&actor_list);
@@ -74,21 +117,29 @@ void actor_initialize(void) {
 
 static actor_t *actor_create(void) {
   actor_t *actor = (actor_t *)actor_malloc(sizeof(actor_t));
+  int i;
 
   if (!actor)
     return NULL;
 
   memset(actor, 0, sizeof(actor_t));
 
-  list_init(&actor->actor_node);
-  list_init(&actor->inbox);
-  list_init(&actor->trash);
-
   mutex_create(&actor->mutex);
   cond_create(&actor->r_cond);
   cond_create(&actor->w_cond);
 
+  list_init(&actor->actor_node);
+  list_init(&actor->trash);
+
+  for (i = 0; i < ACTOR_PRIORITIES; ++i) {
+    list_init(&actor->inbox[i]);
+    actor->stack[i] = -1;
+  }
+
   actor->maxsize = ACTOR_MAXMSG;
+
+  actor->stack_top = -1;
+  qstack_push(actor, ACTOR_HIGH);
 
   return actor;
 }
@@ -108,6 +159,7 @@ static void actor_pop(actor_t *actor) {
 static void actor_destroy(actor_t *actor) {
   mailmsg_t *msg;
   list_t *p;
+  int i;
 
   actor_pop(actor);
 
@@ -119,11 +171,12 @@ static void actor_destroy(actor_t *actor) {
     actor_free(msg);
   }
 
-  while (!list_empty(&actor->inbox)) {
-    p = list_shift(&actor->inbox);
-    msg = list_entry(p, mailmsg_t, mail_node);
-    actor_free(msg);
-  }
+  for (i = 0; i < ACTOR_PRIORITIES; ++i)
+    while (!list_empty(&actor->inbox[i])) {
+      p = list_shift(&actor->inbox[i]);
+      msg = list_entry(p, mailmsg_t, mail_node);
+      actor_free(msg);
+    }
 
   mutex_unlock(&actor->mutex);
 
@@ -192,33 +245,45 @@ static actor_t *actor_query(actorid_t actor_id) {
 void actor_wrap(void (*func)(void *), void *arg) {
   actor_t *actor = actor_current();
 
-  func(arg);
+  if (!actor->wrap.copied) {
+    actor->wrap.func = func;
+    actor->wrap.arg = arg;
+    actor->wrap.copied = 1;
+  }
+
+  if (actor->wrap.func != func || actor->wrap.arg != arg)
+    return;
+
+  actor->wrap.func(actor->wrap.arg);
 
   tls_setvalue(tls, NULL);
   actor_destroy(actor);
 }
 
 static void actor_thread(void *arg) {
+  actor_t *actor = actor_current();
   actorwrap_t *wrap = (actorwrap_t *)arg;
-  actor_wrap(wrap->func, wrap->arg);
-  actor_free(wrap);
+
+  actor->wrap = *wrap;
+  actor->wrap.copied = 1;
+  atom_set(&wrap->copied, 1);
+
+  actor_wrap(actor->wrap.func, actor->wrap.arg);
 }
 
 actorid_t actor_spawn(void (*func)(void *), void *arg) {
   actorid_t actor_id = 0;
-  actorwrap_t *wrap;
+  actorwrap_t wrap = {0, func, arg};
   thread_t thread;
+  int copied = 0;
 
-  wrap = (actorwrap_t *)actor_malloc(sizeof(actorwrap_t));
-
-  if (!wrap)
-    return -1;
-
-  wrap->func = func;
-  wrap->arg = arg;
-
-  actor_id = thread_start(&thread, actor_thread, wrap);
+  actor_id = thread_start(&thread, actor_thread, &wrap);
   thread_detach(&thread);
+
+  do {
+    atom_sync();
+    atom_get(&wrap.copied, &copied);
+  } while (!copied);
 
   return actor_id;
 }
@@ -227,14 +292,14 @@ int actor_receive(actormsg_t *actor_msg, unsigned int timeout) {
   actor_t *actor = actor_current();
   list_t *node;
   mailmsg_t *msg;
-  int retval = 1;
+  int top, retval = 1;
 
   if (!actor)
     return -1;
 
   mutex_lock(&actor->mutex);
 
-  while (list_empty(&actor->inbox)) {
+  while (actor->msgsize == 0) {
     actor->r_waiting += 1;
     retval = cond_timedwait(&actor->r_cond, &actor->mutex, timeout);
     actor->r_waiting -= 1;
@@ -245,7 +310,21 @@ int actor_receive(actormsg_t *actor_msg, unsigned int timeout) {
     }
   }
 
-  node = list_shift(&actor->inbox);
+receive_inbox:
+
+  top = qstack_top(actor);
+  actor->payload[top] += 1;
+
+  if (top != ACTOR_HIGH)
+    qstack_pop(actor);
+
+  if ((actor->payload[top] & 1) == 0)
+    qstack_push(actor, top + 1);
+
+  if (list_empty(&actor->inbox[top]))
+    goto receive_inbox;
+
+  node = list_shift(&actor->inbox[top]);
   actor->msgsize -= 1;
 
   msg = list_entry(node, mailmsg_t, mail_node);
@@ -263,7 +342,8 @@ int actor_receive(actormsg_t *actor_msg, unsigned int timeout) {
   return retval;
 }
 
-static int actor_sendto(actor_t *actor, int type, const void *data, int size) {
+static int actor_sendto(actor_t *actor, int priority, int type,
+                        const void *data, int size) {
   actorid_t sender = actor_self();
   mailmsg_t *msg;
 
@@ -285,6 +365,12 @@ static int actor_sendto(actor_t *actor, int type, const void *data, int size) {
   msg->actor_msg.data = msg->buffer;
   msg->actor_msg.size = size;
 
+  if (priority < ACTOR_HIGH)
+    priority = ACTOR_HIGH;
+
+  if (priority > ACTOR_LOW)
+    priority = ACTOR_LOW;
+
   mutex_lock(&actor->mutex);
 
   while (actor->msgsize == actor->maxsize) {
@@ -293,7 +379,7 @@ static int actor_sendto(actor_t *actor, int type, const void *data, int size) {
     actor->w_waiting -= 1;
   }
 
-  list_push(&actor->inbox, &msg->mail_node);
+  list_push(&actor->inbox[priority], &msg->mail_node);
   actor->msgsize += 1;
 
   if (actor->r_waiting > 0)
@@ -304,7 +390,8 @@ static int actor_sendto(actor_t *actor, int type, const void *data, int size) {
   return 0;
 }
 
-int actor_send(actorid_t actor_id, int type, const void *data, int size) {
+int actor_send(actorid_t actor_id, int priority, int type, const void *data,
+               int size) {
   actor_t *actor = actor_query(actor_id);
 
   if (!actor)
@@ -316,14 +403,15 @@ int actor_send(actorid_t actor_id, int type, const void *data, int size) {
   if (size <= 0)
     return -1;
 
-  return actor_sendto(actor, type, data, size);
+  return actor_sendto(actor, priority, type, data, size);
 }
 
-int actor_reply(actormsg_t *msg, int type, const void *data, int size) {
-  return actor_send(msg->sender, type, data, size);
+int actor_reply(actormsg_t *msg, int priority, int type, const void *data,
+                int size) {
+  return actor_send(msg->sender, priority, type, data, size);
 }
 
-int actor_broadcast(int type, const void *data, int size) {
+int actor_broadcast(int priority, int type, const void *data, int size) {
   actor_t *actor;
   list_t *p, *t;
   int counter = 0;
@@ -333,7 +421,7 @@ int actor_broadcast(int type, const void *data, int size) {
   list_foreach(&actor_list, p, t) {
     actor = list_entry(p, actor_t, actor_node);
 
-    if (0 == actor_sendto(actor, type, data, size))
+    if (0 == actor_sendto(actor, priority, type, data, size))
       counter += 1;
   }
 

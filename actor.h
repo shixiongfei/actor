@@ -54,10 +54,13 @@ typedef long actorid_t;
 typedef struct actormsg_s {
   actorid_t sender;
   actorid_t receiver;
+  int priority;
   int type;
   int size;
   void *data;
 } actormsg_t;
+
+enum { ACTOR_HIGH, ACTOR_MEDIUM, ACTOR_LOW, ACTOR_PRIORITIES };
 
 ACTOR_API void actor_setalloc(void *(*allcator)(void *, size_t));
 
@@ -73,11 +76,12 @@ ACTOR_API actorid_t actor_spawn(void (*func)(void *), void *arg);
 
 /* Return: -1 Failed. 0 Timedout. 1 Success. */
 ACTOR_API int actor_receive(actormsg_t *actor_msg, unsigned int timeout);
-ACTOR_API int actor_send(actorid_t actor_id, int type, const void *data,
-                         int size);
-ACTOR_API int actor_reply(actormsg_t *msg, int type, const void *data,
-                          int size);
-ACTOR_API int actor_broadcast(int type, const void *data, int size);
+ACTOR_API int actor_send(actorid_t actor_id, int priority, int type,
+                         const void *data, int size);
+ACTOR_API int actor_reply(actormsg_t *msg, int priority, int type,
+                          const void *data, int size);
+ACTOR_API int actor_broadcast(int priority, int type, const void *data,
+                              int size);
 
 ACTOR_API actorid_t actor_self(void);
 

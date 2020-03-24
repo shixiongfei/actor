@@ -24,14 +24,14 @@ static void actor_ping(void *arg) {
   actor_receive(&cmd, 0x7fffffff);
 
   while (timers--) {
-    actor_send(pong, 0, "PING", 5);
+    actor_send(pong, ACTOR_HIGH, 0, "PING", 5);
     actor_receive(&msg, 5000);
 
     printf("Actor Ping Receive(%d:%d) %s From %ld\n", msg.type, msg.size,
            (const char *)msg.data, msg.sender);
   }
 
-  actor_reply(&cmd, cmd.type, "FINISHED", 9);
+  actor_reply(&cmd, cmd.priority, cmd.type, "FINISHED", 9);
 }
 
 static void actor_pong(void *arg) {
@@ -45,7 +45,7 @@ static void actor_pong(void *arg) {
     printf("Actor Pong Receive(%d:%d) %s From %ld\n", msg.type, msg.size,
            (const char *)msg.data, msg.sender);
 
-    actor_reply(&msg, 1, "PONG", 5);
+    actor_reply(&msg, msg.priority, 1, "PONG", 5);
   }
 }
 
@@ -54,14 +54,14 @@ static void actor_main(void *arg) {
 
   printf("Actor Main ID: %ld\n", actor_self());
 
-  actor_send(ping, -1, "START", 6);
+  actor_send(ping, ACTOR_LOW, -1, "START", 6);
   actor_receive(&msg, 0x7fffffff);
 }
 
 int main(int argc, char *argv[]) {
   actor_initialize();
 
-  printf("CPU Nums: %d\n",actor_cpunum());
+  printf("CPU Nums: %d\n", actor_cpunum());
 
   ping = actor_spawn(actor_ping, NULL);
   pong = actor_spawn(actor_pong, NULL);
