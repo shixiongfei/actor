@@ -355,21 +355,22 @@ static int actor_sendto(actor_t *actor, int priority, int type,
   if (!msg)
     return -1;
 
+  if (priority < ACTOR_HIGH)
+    priority = ACTOR_HIGH;
+
+  if (priority > ACTOR_LOW)
+    priority = ACTOR_LOW;
+
   list_init(&msg->mail_node);
 
   memcpy(msg->buffer, data, size);
 
   msg->actor_msg.receiver = actor->actor_id;
   msg->actor_msg.sender = sender;
+  msg->actor_msg.priority = priority;
   msg->actor_msg.type = type;
   msg->actor_msg.data = msg->buffer;
   msg->actor_msg.size = size;
-
-  if (priority < ACTOR_HIGH)
-    priority = ACTOR_HIGH;
-
-  if (priority > ACTOR_LOW)
-    priority = ACTOR_LOW;
 
   mutex_lock(&actor->mutex);
 
