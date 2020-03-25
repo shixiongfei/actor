@@ -310,24 +310,20 @@ int actor_receive(actormsg_t *actor_msg, unsigned int timeout) {
     }
   }
 
-receive_inbox:
+  do {
+    top = qstack_top(actor);
+    actor->payload[top] += 1;
 
-  top = qstack_top(actor);
-  actor->payload[top] += 1;
+    if (top != ACTOR_HIGH)
+      qstack_pop(actor);
 
-  if (top != ACTOR_HIGH)
-    qstack_pop(actor);
-
-  if ((actor->payload[top] & 1) == 0)
-    qstack_push(actor, top + 1);
-
-  if (list_empty(&actor->inbox[top]))
-    goto receive_inbox;
+    if ((actor->payload[top] & 1) == 0)
+      qstack_push(actor, top + 1);
+  } while (list_empty(&actor->inbox[top]));
 
   node = list_shift(&actor->inbox[top]);
-  actor->msgsize -= 1;
-
   msg = list_entry(node, mailmsg_t, mail_node);
+  actor->msgsize -= 1;
 
   if (actor_msg)
     *actor_msg = msg->actor_msg;
