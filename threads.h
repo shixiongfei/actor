@@ -89,6 +89,7 @@ int thread_start(thread_t *thread, void (*func)(void *), void *arg);
 int thread_join(thread_t *thread);
 int thread_detach(thread_t *thread);
 int thread_kill(thread_t *thread);
+void thread_sleep(unsigned int millisec);
 
 #ifdef __cplusplus
 };

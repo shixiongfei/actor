@@ -73,6 +73,7 @@ ACTOR_API void actor_finalize(void);
 
 ACTOR_API void actor_wrap(void (*func)(void *), void *arg);
 ACTOR_API actorid_t actor_spawn(void (*func)(void *), void *arg);
+ACTOR_API int actor_wait(actorid_t actor_id);
 
 /* Return: -1 Failed. 0 Timedout. 1 Success. */
 ACTOR_API int actor_receive(actormsg_t *actor_msg, unsigned int timeout);

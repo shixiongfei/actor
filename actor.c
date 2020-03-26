@@ -288,6 +288,12 @@ actorid_t actor_spawn(void (*func)(void *), void *arg) {
   return actor_id;
 }
 
+int actor_wait(actorid_t actor_id) {
+  while (!!actor_query(actor_id))
+    thread_sleep(10);
+  return 0;
+}
+
 int actor_receive(actormsg_t *actor_msg, unsigned int timeout) {
   actor_t *actor = actor_current();
   list_t *node;
