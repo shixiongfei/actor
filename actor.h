@@ -35,7 +35,7 @@
 
 #define ACTOR_MAJOR 0
 #define ACTOR_MINOR 2
-#define ACTOR_PATCH 0
+#define ACTOR_PATCH 1
 
 #define ACTOR_VERMAJOR ACTOR_QUOTE(ACTOR_MAJOR)
 #define ACTOR_VERMINOR ACTOR_QUOTE(ACTOR_MINOR)
@@ -61,6 +61,7 @@ typedef struct actormsg_s {
 } actormsg_t;
 
 enum { ACTOR_HIGH, ACTOR_MEDIUM, ACTOR_LOW, ACTOR_PRIORITIES };
+enum { ACTOR_FAILED = -1, ACTOR_TIMEOUT, ACTOR_SUCCESS };
 
 ACTOR_API void actor_setalloc(void *(*allcator)(void *, size_t));
 
@@ -73,6 +74,8 @@ ACTOR_API void actor_finalize(void);
 
 ACTOR_API void actor_wrap(void (*func)(void *), void *arg);
 ACTOR_API actorid_t actor_spawn(void (*func)(void *), void *arg);
+
+ACTOR_API int actor_msgsize(actorid_t actor_id);
 ACTOR_API int actor_wait(actorid_t actor_id);
 
 /* Return: -1 Failed. 0 Timedout. 1 Success. */

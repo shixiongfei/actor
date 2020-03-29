@@ -288,6 +288,20 @@ actorid_t actor_spawn(void (*func)(void *), void *arg) {
   return actor_id;
 }
 
+int actor_msgsize(actorid_t actor_id) {
+  actor_t *actor = actor_query(actor_id);
+  int msgsize;
+
+  if (!actor)
+    return -1;
+
+  mutex_lock(&actor->mutex);
+  msgsize = actor->msgsize;
+  mutex_unlock(&actor->mutex);
+
+  return msgsize;
+}
+
 int actor_wait(actorid_t actor_id) {
   while (!!actor_query(actor_id))
     thread_sleep(10);
@@ -298,7 +312,7 @@ int actor_receive(actormsg_t *actor_msg, unsigned int timeout) {
   actor_t *actor = actor_current();
   list_t *node;
   mailmsg_t *msg;
-  int top, retval = 1;
+  int top, retval;
 
   if (!actor)
     return -1;
@@ -310,7 +324,7 @@ int actor_receive(actormsg_t *actor_msg, unsigned int timeout) {
     retval = cond_timedwait(&actor->r_cond, &actor->mutex, timeout);
     actor->r_waiting -= 1;
 
-    if (retval < 1) {
+    if (retval != ACTOR_SUCCESS) {
       mutex_unlock(&actor->mutex);
       return retval;
     }
@@ -341,7 +355,7 @@ int actor_receive(actormsg_t *actor_msg, unsigned int timeout) {
 
   mutex_unlock(&actor->mutex);
 
-  return retval;
+  return ACTOR_SUCCESS;
 }
 
 static int actor_sendto(actor_t *actor, int priority, int type,
@@ -365,14 +379,15 @@ static int actor_sendto(actor_t *actor, int priority, int type,
 
   list_init(&msg->mail_node);
 
-  memcpy(msg->buffer, data, size);
-
   msg->actor_msg.receiver = actor->actor_id;
   msg->actor_msg.sender = sender;
   msg->actor_msg.priority = priority;
   msg->actor_msg.type = type;
   msg->actor_msg.data = msg->buffer;
   msg->actor_msg.size = size;
+
+  if (data)
+    memcpy(msg->buffer, data, size);
 
   mutex_lock(&actor->mutex);
 
@@ -400,13 +415,7 @@ int actor_send(actorid_t actor_id, int priority, int type, const void *data,
   if (!actor)
     return -1;
 
-  if (!data)
-    return -1;
-
-  if (size <= 0)
-    return -1;
-
-  return actor_sendto(actor, priority, type, data, size);
+  return actor_sendto(actor, priority, type, data, size > 0 ? size : 0);
 }
 
 int actor_reply(actormsg_t *msg, int priority, int type, const void *data,
