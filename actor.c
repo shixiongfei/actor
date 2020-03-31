@@ -307,7 +307,7 @@ int actor_status(actorid_t actor_id) {
   if (!actor)
     return ACTOR_DEAD;
 
-  atom_get(&actor->status, &status);  
+  atom_get(&actor->status, &status);
 
   return status;
 }
@@ -329,7 +329,10 @@ int actor_msgsize(actorid_t actor_id) {
 int actor_wait(actorid_t actor_id, unsigned int timeout) {
   int elapse;
 
-  while (timeout > 0 || ACTOR_DEAD != actor_status(actor_id)) {
+  if (actor_self() == actor_id)
+    return ACTOR_FAILED;
+
+  while (timeout > 0 && ACTOR_DEAD != actor_status(actor_id)) {
     elapse = timeout < 10 ? timeout : 10;
     timeout -= elapse;
 
