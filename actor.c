@@ -58,6 +58,7 @@ typedef struct actor_s {
   int stack[ACTOR_PRIORITIES];
   int stack_top;
 
+  int status;
   int msgsize;
   int maxsize;
 
@@ -136,6 +137,7 @@ static actor_t *actor_create(void) {
     actor->stack[i] = -1;
   }
 
+  atom_set(&actor->status, ACTOR_SUSPENDED);
   actor->maxsize = ACTOR_MAXMSG;
 
   actor->stack_top = -1;
@@ -254,6 +256,7 @@ void actor_wrap(void (*func)(void *), void *arg) {
   if (actor->wrap.func != func || actor->wrap.arg != arg)
     return;
 
+  atom_set(&actor->status, ACTOR_RUNNING);
   actor->wrap.func(actor->wrap.arg);
 
   tls_setvalue(tls, NULL);
@@ -288,6 +291,27 @@ actorid_t actor_spawn(void (*func)(void *), void *arg) {
   return actor_id;
 }
 
+actorid_t actor_self(void) {
+  actor_t *actor = actor_tryget();
+
+  if (!actor)
+    return -1;
+
+  return actor->actor_id;
+}
+
+int actor_status(actorid_t actor_id) {
+  actor_t *actor = actor_query(actor_id);
+  int status;
+
+  if (!actor)
+    return ACTOR_DEAD;
+
+  atom_get(&actor->status, &status);  
+
+  return status;
+}
+
 int actor_msgsize(actorid_t actor_id) {
   actor_t *actor = actor_query(actor_id);
   int msgsize;
@@ -302,10 +326,17 @@ int actor_msgsize(actorid_t actor_id) {
   return msgsize;
 }
 
-int actor_wait(actorid_t actor_id) {
-  while (!!actor_query(actor_id))
-    thread_sleep(10);
-  return 0;
+int actor_wait(actorid_t actor_id, unsigned int timeout) {
+  int elapse;
+
+  while (timeout > 0 || ACTOR_DEAD != actor_status(actor_id)) {
+    elapse = timeout < 10 ? timeout : 10;
+    timeout -= elapse;
+
+    thread_sleep(elapse);
+  }
+
+  return ACTOR_DEAD == actor_status(actor_id) ? ACTOR_SUCCESS : ACTOR_TIMEOUT;
 }
 
 int actor_receive(actormsg_t *actor_msg, unsigned int timeout) {
@@ -440,15 +471,6 @@ int actor_broadcast(int priority, int type, const void *data, int size) {
   mutex_unlock(&actor_mutex);
 
   return counter;
-}
-
-actorid_t actor_self(void) {
-  actor_t *actor = actor_tryget();
-
-  if (!actor)
-    return -1;
-
-  return actor->actor_id;
 }
 
 void actor_garbagecollect(void) {

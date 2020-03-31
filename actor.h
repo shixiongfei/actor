@@ -62,6 +62,7 @@ typedef struct actormsg_s {
 
 enum { ACTOR_HIGH, ACTOR_MEDIUM, ACTOR_LOW, ACTOR_PRIORITIES };
 enum { ACTOR_FAILED = -1, ACTOR_TIMEOUT, ACTOR_SUCCESS };
+enum { ACTOR_DEAD = -1, ACTOR_SUSPENDED, ACTOR_RUNNING };
 
 ACTOR_API void actor_setalloc(void *(*allcator)(void *, size_t));
 
@@ -74,9 +75,11 @@ ACTOR_API void actor_finalize(void);
 
 ACTOR_API void actor_wrap(void (*func)(void *), void *arg);
 ACTOR_API actorid_t actor_spawn(void (*func)(void *), void *arg);
+ACTOR_API actorid_t actor_self(void);
 
+ACTOR_API int actor_status(actorid_t actor_id);
 ACTOR_API int actor_msgsize(actorid_t actor_id);
-ACTOR_API int actor_wait(actorid_t actor_id);
+ACTOR_API int actor_wait(actorid_t actor_id, unsigned int timeout);
 
 /* Return: -1 Failed. 0 Timedout. 1 Success. */
 ACTOR_API int actor_receive(actormsg_t *actor_msg, unsigned int timeout);
@@ -86,8 +89,6 @@ ACTOR_API int actor_reply(actormsg_t *msg, int priority, int type,
                           const void *data, int size);
 ACTOR_API int actor_broadcast(int priority, int type, const void *data,
                               int size);
-
-ACTOR_API actorid_t actor_self(void);
 
 /* Please call garbage collect regularly to clean up the actor memory. */
 ACTOR_API void actor_garbagecollect(void);
