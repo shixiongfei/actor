@@ -64,7 +64,7 @@ enum { ACTOR_HIGH, ACTOR_MEDIUM, ACTOR_LOW, ACTOR_PRIORITIES };
 enum { ACTOR_FAILED = -1, ACTOR_TIMEOUT, ACTOR_SUCCESS };
 enum { ACTOR_DEAD = -1, ACTOR_SUSPENDED, ACTOR_RUNNING };
 
-ACTOR_API void actor_setalloc(void *(*allcator)(void *, size_t));
+ACTOR_API void actor_setalloc(void *(*allocator)(void *, size_t));
 
 ACTOR_API int actor_cpunum(void);
 ACTOR_API int actor_gettid(void);
