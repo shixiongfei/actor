@@ -141,6 +141,54 @@ int cond_broadcast(cond_t *cnd) {
 }
 #endif
 
+int sema_init(sema_t *sem, unsigned int value) {
+  if (0 != mutex_create(&sem->mutex))
+    return -1;
+
+  if (0 != cond_create(&sem->cond)) {
+    mutex_destroy(&sem->mutex);
+    return -1;
+  }
+
+  sem->value = value;
+  return 0;
+}
+
+void sema_destroy(sema_t *sem) {
+  cond_destroy(&sem->cond);
+  mutex_destroy(&sem->mutex);
+}
+
+void sema_post(sema_t *sem) {
+  mutex_lock(&sem->mutex);
+  sem->value += 1;
+  if (sem->value > 0)
+    cond_signal(&sem->cond);
+  mutex_unlock(&sem->mutex);
+}
+
+void sema_wait(sema_t *sem) {
+  mutex_lock(&sem->mutex);
+  while (0 == sem->value)
+    cond_wait(&sem->cond, &sem->mutex);
+  sem->value -= 1;
+  mutex_unlock(&sem->mutex);
+}
+
+int sema_trywait(sema_t *sem) {
+  if (0 != mutex_trylock(&sem->mutex))
+    return -1;
+
+  if (0 == sem->value) {
+    mutex_unlock(&sem->mutex);
+    return -1;
+  }
+
+  sem->value -= 1;
+  mutex_unlock(&sem->mutex);
+  return 0;
+}
+
 #ifndef _WIN32
 int tls_create(tls_t *tls) {
   return (0 == pthread_key_create(tls, NULL)) ? 0 : -1;

@@ -64,6 +64,12 @@ typedef CONDITION_VARIABLE cond_t;
 typedef DWORD tls_t;
 #endif
 
+typedef struct sema_s {
+  mutex_t mutex;
+  cond_t cond;
+  unsigned int value;
+} sema_t;
+
 typedef pthread_t thread_t;
 
 int mutex_create(mutex_t *mtx);
@@ -79,6 +85,12 @@ int cond_wait(cond_t *cnd, mutex_t *mtx);
 int cond_timedwait(cond_t *cnd, mutex_t *mtx, unsigned int millisec);
 int cond_signal(cond_t *cnd);
 int cond_broadcast(cond_t *cnd);
+
+int sema_init(sema_t *sem, unsigned int value);
+void sema_destroy(sema_t *sem);
+void sema_post(sema_t *sem);
+void sema_wait(sema_t *sem);
+int sema_trywait(sema_t *sem);
 
 int tls_create(tls_t *tls);
 void tls_destroy(tls_t tls);
