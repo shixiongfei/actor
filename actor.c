@@ -31,8 +31,8 @@ void actor_setalloc(void *(*allocator)(void *, size_t)) {
   actor_alloc = allocator ? allocator : alloc_emul;
 }
 
-#define actor_malloc(size) actor_alloc(NULL, size)
-#define actor_free(ptr) actor_alloc(ptr, 0)
+void *actor_malloc(size_t size) { return actor_alloc(NULL, size); }
+void actor_free(void *ptr) { actor_alloc(ptr, 0); }
 
 typedef struct mailmsg_s {
   actormsg_t actor_msg;
@@ -41,14 +41,17 @@ typedef struct mailmsg_s {
 } mailmsg_t;
 
 typedef struct actorwrap_s {
-  int copied;
+  actorid_t actor_id;
+  sema_t sem;
   void (*func)(void *);
   void *arg;
 } actorwrap_t;
 
 typedef struct actor_s {
   actorid_t actor_id;
-  actorwrap_t wrap;
+
+  void (*func)(void *);
+  void *arg;
 
   list_t actor_node;
   list_t trash;
@@ -244,51 +247,63 @@ static actor_t *actor_query(actorid_t actor_id) {
   return actor;
 }
 
-void actor_wrap(void (*func)(void *), void *arg) {
-  actor_t *actor = actor_current();
-
-  if (!actor->wrap.copied) {
-    actor->wrap.func = func;
-    actor->wrap.arg = arg;
-    actor->wrap.copied = 1;
+static void actor_run(actor_t *actor) {
+  if (actor->func) {
+    atom_set(&actor->status, ACTOR_RUNNING);
+    actor->func(actor->arg);
   }
-
-  if (actor->wrap.func != func || actor->wrap.arg != arg)
-    return;
-
-  atom_set(&actor->status, ACTOR_RUNNING);
-  actor->wrap.func(actor->wrap.arg);
 
   tls_setvalue(tls, NULL);
   actor_destroy(actor);
+}
+
+void actor_wrap(void (*func)(void *), void *arg) {
+  actor_t *actor = actor_current();
+
+  if (!actor)
+    return;
+
+  actor->func = func;
+  actor->arg = arg;
+
+  actor_run(actor);
 }
 
 static void actor_thread(void *arg) {
   actor_t *actor = actor_current();
   actorwrap_t *wrap = (actorwrap_t *)arg;
 
-  actor->wrap = *wrap;
-  actor->wrap.copied = 1;
-  atom_set(&wrap->copied, 1);
+  if (!actor)
+    return;
 
-  actor_wrap(actor->wrap.func, actor->wrap.arg);
+  actor->func = wrap->func;
+  actor->arg = wrap->arg;
+
+  wrap->actor_id = actor->actor_id;
+  sema_post(&wrap->sem);
+
+  actor_run(actor);
 }
 
 actorid_t actor_spawn(void (*func)(void *), void *arg) {
-  actorid_t actor_id = 0;
-  actorwrap_t wrap = {0, func, arg};
+  actorwrap_t wrap;
   thread_t thread;
-  int copied = 0;
 
-  actor_id = thread_start(&thread, actor_thread, &wrap);
+  wrap.actor_id = 0;
+  wrap.func = func;
+  wrap.arg = arg;
+  sema_init(&wrap.sem, 0);
+
+  if (0 != thread_start(&thread, actor_thread, &wrap)) {
+    sema_destroy(&wrap.sem);
+    return -1;
+  }
   thread_detach(&thread);
 
-  do {
-    atom_sync();
-    atom_get(&wrap.copied, &copied);
-  } while (!copied);
+  sema_wait(&wrap.sem);
+  sema_destroy(&wrap.sem);
 
-  return actor_id;
+  return wrap.actor_id;
 }
 
 actorid_t actor_self(void) {

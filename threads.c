@@ -30,6 +30,9 @@
 #include "actor.h"
 #include "threads.h"
 
+extern void *actor_malloc(size_t);
+extern void actor_free(void *);
+
 #ifndef _WIN32
 int mutex_create(mutex_t *mtx) {
   int retval = -1;
@@ -286,14 +289,13 @@ int actor_getpid(void) { return _getpid(); }
 
 int actor_gettid(void) { return gettid(); }
 
-typedef struct cthread_s {
-  int tid;
+typedef struct threadctx_s {
   void (*func)(void *);
   void *arg;
-} cthread_t;
+} threadctx_t;
 
 DECLARE_THREAD_CB(cthread_entry, param) {
-  cthread_t ctx = *(cthread_t *)param;
+  threadctx_t *ctx = (threadctx_t *)param;
 
 #ifndef _WIN32
   struct sigaction act;
@@ -305,25 +307,26 @@ DECLARE_THREAD_CB(cthread_entry, param) {
   sigaction(SIGUSR1, &act, NULL);
 #endif
 
-  atom_set(&((cthread_t *)param)->tid, actor_gettid());
-  ctx.func(ctx.arg);
+  ctx->func(ctx->arg);
+  actor_free(ctx);
 
   return THREAD_CODE(0);
 }
 
 int thread_start(thread_t *thread, void (*func)(void *), void *arg) {
-  cthread_t ctx = {0, func, arg};
-  int tid = 0;
+  threadctx_t *ctx = (threadctx_t *)actor_malloc(sizeof(threadctx_t));
 
-  if (0 != pthread_create(thread, 0, cthread_entry, &ctx))
+  if (!ctx)
     return -1;
 
-  do {
-    atom_sync();
-    atom_get(&ctx.tid, &tid);
-  } while (!tid);
+  ctx->func = func;
+  ctx->arg = arg;
 
-  return tid;
+  if (0 != pthread_create(thread, 0, cthread_entry, ctx)) {
+    actor_free(ctx);
+    return -1;
+  }
+  return 0;
 }
 
 int thread_join(thread_t *thread) {
