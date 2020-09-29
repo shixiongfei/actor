@@ -9,6 +9,7 @@
  *  https://github.com/shixiongfei/actor
  */
 
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -224,6 +225,7 @@ static actor_t *actor_current(void) {
     }
   }
 
+  assert(actor != NULL);
   return actor;
 }
 
@@ -308,6 +310,8 @@ actorid_t actor_spawn(void (*func)(void *), void *arg) {
 
 actorid_t actor_self(void) {
   actor_t *actor = actor_tryget();
+
+  assert(actor != NULL);
 
   if (!actor)
     return -1;
@@ -495,6 +499,8 @@ void actor_garbagecollect(void) {
   actor_t *actor = actor_tryget();
   mailmsg_t *msg;
   list_t *p;
+
+  assert(actor != NULL);
 
   if (!actor)
     return;
