@@ -48,13 +48,16 @@ solution ( "actor" )
 
   configuration ( "gmake" )
     warnings  "Default" --"Extra"
-    defines { "LINUX_OR_MACOSX" }
 
   configuration { "gmake", "macosx" }
     defines { "__APPLE__", "__MACH__", "__MRC__", "macintosh" }
 
   configuration { "gmake", "linux" }
     defines { "__linux__" }
+    links { "pthread" }
+
+  configuration { "gmake", "bsd" }
+    defines { "__BSD__" }
     links { "pthread" }
 
   -- A project defines one build target
@@ -86,10 +89,12 @@ solution ( "actor" )
 
   configuration ( "gmake" )
     warnings  "Default" --"Extra"
-    defines { "LINUX_OR_MACOSX" }
 
   configuration { "gmake", "macosx" }
     defines { "__APPLE__", "__MACH__", "__MRC__", "macintosh" }
 
   configuration { "gmake", "linux" }
     defines { "__linux__" }
+
+  configuration { "gmake", "bsd" }
+    defines { "__BSD__" }

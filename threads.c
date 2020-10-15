@@ -229,7 +229,7 @@ void *tls_getvalue(tls_t tls) { return TlsGetValue(tls); }
 #ifndef _WIN32
 #if defined(__linux__)
 #define gettid() syscall(__NR_gettid)
-#elif defined(__APPLE__)
+#elif defined(__APPLE__) || defined(__BSD__)
 #define gettid() pthread_mach_thread_np(pthread_self())
 #endif
 
