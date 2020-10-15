@@ -19,7 +19,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#if defined(__linux__)
+#if defined(__linux__) || defined(__BSD__)
 #include <sys/syscall.h>
 #endif
 #else /* _WIN32 */
@@ -229,8 +229,14 @@ void *tls_getvalue(tls_t tls) { return TlsGetValue(tls); }
 #ifndef _WIN32
 #if defined(__linux__)
 #define gettid() syscall(__NR_gettid)
-#elif defined(__APPLE__) || defined(__BSD__)
+#elif defined(__APPLE__)
 #define gettid() pthread_mach_thread_np(pthread_self())
+#elif defined(__FreeBSD__)
+#define gettid() syscall(SYS_thr_self)
+#elif defined(__OpenBSD__)
+#define gettid() syscall(SYS_getthrid)
+#elif defined(__NetBSD__)
+#define gettid() syscall(SYS__lwp_self)
 #endif
 
 #define DECLARE_THREAD_CB(nm, arg) static void *nm(void *arg)
