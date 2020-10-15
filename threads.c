@@ -19,9 +19,18 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#if defined(__linux__) || defined(__BSD__)
+#if defined(__linux__)
 #include <sys/syscall.h>
-#endif
+#endif /* __linux__ */
+
+#if defined(__FreeBSD__)
+#include <pthread_np.h>
+#endif /* __FreeBSD__  */
+
+#if defined(__NetBSD__)
+#include <lwp.h>
+#endif /* __NetBSD  */
+
 #else /* _WIN32 */
 #include <Windows.h>
 #include <process.h>
@@ -227,23 +236,11 @@ void *tls_getvalue(tls_t tls) { return TlsGetValue(tls); }
 #endif
 
 #ifndef _WIN32
-#if defined(__linux__)
-#define gettid() syscall(__NR_gettid)
-#elif defined(__APPLE__)
-#define gettid() pthread_mach_thread_np(pthread_self())
-#elif defined(__FreeBSD__)
-#define gettid() syscall(SYS_thr_self)
-#elif defined(__OpenBSD__)
-#define gettid() syscall(SYS_getthrid)
-#elif defined(__NetBSD__)
-#define gettid() syscall(SYS__lwp_self)
-#endif
-
 #define DECLARE_THREAD_CB(nm, arg) static void *nm(void *arg)
 #define THREAD_CODE(x) ((void *)((intptr_t)(x)))
 
 static void thread_killer(int sig) { pthread_exit(NULL); }
-#else
+#else /* _WIN32  */
 #define pthread_exit(n) _endthreadex(n)
 #define pthread_create(h, a, f, p)                                             \
   ((HANDLE)-1 == ((*h) = (HANDLE)_beginthreadex(NULL, (a), (f), (p), 0, NULL)) \
@@ -272,7 +269,6 @@ static int pthread_kill(pthread_t h, int sig) {
   return TerminateThread(h, 0) ? 0 : -1;
 }
 
-#define gettid() GetCurrentThreadId()
 #define DECLARE_THREAD_CB(nm, arg) static unsigned int __stdcall nm(void *arg)
 #define THREAD_CODE(x) ((unsigned int)(x))
 #endif /* _WIN32 */
@@ -293,7 +289,23 @@ int actor_getpid(void) { return (int)getpid(); }
 int actor_getpid(void) { return _getpid(); }
 #endif
 
-int actor_gettid(void) { return gettid(); }
+int actor_gettid(void) {
+#if defined(_WIN32)
+  return GetCurrentThreadId();
+#elif defined(__linux__)
+  return syscall(__NR_gettid);
+#elif defined(__APPLE__)
+  return pthread_mach_thread_np(pthread_self());
+#elif defined(__FreeBSD__)
+  return pthread_getthreadid_np();
+#elif defined(__OpenBSD__)
+  return getthrid();
+#elif defined(__NetBSD__)
+  return _lwp_self();
+#else
+#error "Unable to get thread id."
+#endif
+}
 
 typedef struct threadctx_s {
   void (*func)(void *);
