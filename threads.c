@@ -3,7 +3,7 @@
  *
  *  copyright (c) 2019, 2020 Xiongfei Shi
  *
- *  author: Xiongfei Shi <jenson.shixf(a)gmail.com>
+ *  author: Xiongfei Shi <xiongfei.shi(a)icloud.com>
  *  license: Apache2.0
  *
  *  https://github.com/shixiongfei/actor
@@ -137,9 +137,9 @@ int cond_wait(cond_t *cnd, mutex_t *mtx) {
 }
 
 int cond_timedwait(cond_t *cnd, mutex_t *mtx, unsigned int millisec) {
-  return (TRUE == SleepConditionVariableCS(cnd, mtx, millisec))
-             ? 1
-             : (ERROR_TIMEOUT == GetLastError()) ? 0 : -1;
+  return (TRUE == SleepConditionVariableCS(cnd, mtx, millisec)) ? 1
+         : (ERROR_TIMEOUT == GetLastError())                    ? 0
+                                                                : -1;
 }
 
 int cond_signal(cond_t *cnd) {

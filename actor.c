@@ -3,7 +3,7 @@
  *
  *  copyright (c) 2019, 2020 Xiongfei Shi
  *
- *  author: Xiongfei Shi <jenson.shixf(a)gmail.com>
+ *  author: Xiongfei Shi <xiongfei.shi(a)icloud.com>
  *  license: Apache-2.0
  *
  *  https://github.com/shixiongfei/actor
@@ -319,6 +319,29 @@ actorid_t actor_self(void) {
   return actor->actor_id;
 }
 
+static void actor_garbagecollect(void) {
+  actor_t *actor = actor_tryget();
+  mailmsg_t *msg;
+  list_t *p;
+
+  assert(actor != NULL);
+
+  if (!actor)
+    return;
+
+  mutex_lock(&actor->mutex);
+
+  while (!list_empty(&actor->trash)) {
+    p = list_shift(&actor->trash);
+    msg = list_entry(p, mailmsg_t, mail_node);
+    actor_free(msg);
+  }
+
+  mutex_unlock(&actor->mutex);
+}
+
+void actor_tickupdate(void) { actor_garbagecollect(); }
+
 int actor_status(actorid_t actor_id) {
   actor_t *actor = actor_query(actor_id);
   int status;
@@ -493,25 +516,4 @@ int actor_broadcast(int priority, int type, const void *data, int size) {
   mutex_unlock(&actor_mutex);
 
   return counter;
-}
-
-void actor_garbagecollect(void) {
-  actor_t *actor = actor_tryget();
-  mailmsg_t *msg;
-  list_t *p;
-
-  assert(actor != NULL);
-
-  if (!actor)
-    return;
-
-  mutex_lock(&actor->mutex);
-
-  while (!list_empty(&actor->trash)) {
-    p = list_shift(&actor->trash);
-    msg = list_entry(p, mailmsg_t, mail_node);
-    actor_free(msg);
-  }
-
-  mutex_unlock(&actor->mutex);
 }

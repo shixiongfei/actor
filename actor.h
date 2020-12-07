@@ -3,7 +3,7 @@
  *
  *  copyright (c) 2019, 2020 Xiongfei Shi
  *
- *  author: Xiongfei Shi <jenson.shixf(a)gmail.com>
+ *  author: Xiongfei Shi <xiongfei.shi(a)icloud.com>
  *  license: Apache-2.0
  *
  *  https://github.com/shixiongfei/actor
@@ -34,7 +34,7 @@
 #define ACTOR_QUOTE(x) ACTOR_QUOTEX(x)
 
 #define ACTOR_MAJOR 0
-#define ACTOR_MINOR 4
+#define ACTOR_MINOR 5
 #define ACTOR_PATCH 0
 
 #define ACTOR_VERMAJOR ACTOR_QUOTE(ACTOR_MAJOR)
@@ -76,6 +76,7 @@ ACTOR_API void actor_finalize(void);
 ACTOR_API void actor_wrap(void (*func)(void *), void *arg);
 ACTOR_API actorid_t actor_spawn(void (*func)(void *), void *arg);
 ACTOR_API actorid_t actor_self(void);
+ACTOR_API void actor_tickupdate(void);
 
 ACTOR_API int actor_status(actorid_t actor_id);
 ACTOR_API int actor_msgsize(actorid_t actor_id);
@@ -89,9 +90,6 @@ ACTOR_API int actor_reply(actormsg_t *msg, int priority, int type,
                           const void *data, int size);
 ACTOR_API int actor_broadcast(int priority, int type, const void *data,
                               int size);
-
-/* Please call garbage collect regularly to clean up the actor memory. */
-ACTOR_API void actor_garbagecollect(void);
 
 #ifdef __cplusplus
 };

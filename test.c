@@ -1,9 +1,9 @@
 /*
  *  test.c
  *
- *  copyright (c) 2019 Xiongfei Shi
+ *  copyright (c) 2019, 2020 Xiongfei Shi
  *
- *  author: Xiongfei Shi <jenson.shixf(a)gmail.com>
+ *  author: Xiongfei Shi <xiongfei.shi(a)icloud.com>
  *  license: Apache-2.0
  *
  *  https://github.com/shixiongfei/actor
@@ -24,6 +24,8 @@ static void actor_ping(void *arg) {
   actor_receive(&cmd, 0x7fffffff);
 
   while (timers--) {
+    actor_tickupdate();
+
     actor_send(pong, ACTOR_HIGH, 0, "PING", 5);
     actor_receive(&msg, 5000);
 
@@ -40,6 +42,8 @@ static void actor_pong(void *arg) {
   printf("Actor Pong ID: %ld\n", actor_self());
 
   while (1) {
+    actor_tickupdate();
+
     actor_receive(&msg, 0x7fffffff);
 
     printf("Actor Pong Receive(%d:%d) %s From %ld\n", msg.type, msg.size,
@@ -56,6 +60,8 @@ static void actor_main(void *arg) {
 
   actor_send(ping, ACTOR_LOW, -1, "START", 6);
   actor_receive(&msg, 0x7fffffff);
+
+  actor_tickupdate();
 }
 
 int main(int argc, char *argv[]) {
