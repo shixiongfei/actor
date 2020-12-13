@@ -63,6 +63,7 @@ typedef struct actor_s {
   int stack_top;
 
   int status;
+  int shutdown;
   int msgsize;
   int maxsize;
 
@@ -340,7 +341,11 @@ static void actor_garbagecollect(void) {
   mutex_unlock(&actor->mutex);
 }
 
-void actor_tickupdate(void) { actor_garbagecollect(); }
+int actor_tickupdate(void) {
+  actor_garbagecollect();
+
+  return 0;
+}
 
 int actor_status(actorid_t actor_id) {
   actor_t *actor = actor_query(actor_id);
@@ -382,6 +387,36 @@ int actor_wait(actorid_t actor_id, unsigned int timeout) {
   }
 
   return ACTOR_DEAD == actor_status(actor_id) ? ACTOR_SUCCESS : ACTOR_TIMEOUT;
+}
+
+int actor_shutdown(actorid_t actor_id) {
+  actor_t *actor = actor_query(actor_id);
+
+  if (!actor)
+    return -1;
+
+  atom_set(&actor->shutdown, 1);
+
+  return 0;
+}
+
+int actor_receivable(actorid_t actor_id) { return actor_msgsize(actor_id) > 0; }
+
+static int actor_isshutdown(actor_t *actor) {
+  int shutdown;
+
+  atom_get(&actor->shutdown, &shutdown);
+
+  return shutdown;
+}
+
+int actor_sendable(actorid_t actor_id) {
+  actor_t *actor = actor_query(actor_id);
+
+  if (!actor)
+    return 0;
+
+  return !actor_isshutdown(actor);
 }
 
 int actor_receive(actormsg_t *actor_msg, unsigned int timeout) {
@@ -489,6 +524,9 @@ int actor_send(actorid_t actor_id, int priority, int type, const void *data,
   actor_t *actor = actor_query(actor_id);
 
   if (!actor)
+    return -1;
+
+  if (actor_isshutdown(actor))
     return -1;
 
   return actor_sendto(actor, priority, type, data, size > 0 ? size : 0);

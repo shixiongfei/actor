@@ -34,7 +34,7 @@
 #define ACTOR_QUOTE(x) ACTOR_QUOTEX(x)
 
 #define ACTOR_MAJOR 0
-#define ACTOR_MINOR 5
+#define ACTOR_MINOR 6
 #define ACTOR_PATCH 0
 
 #define ACTOR_VERMAJOR ACTOR_QUOTE(ACTOR_MAJOR)
@@ -76,11 +76,15 @@ ACTOR_API void actor_finalize(void);
 ACTOR_API void actor_wrap(void (*func)(void *), void *arg);
 ACTOR_API actorid_t actor_spawn(void (*func)(void *), void *arg);
 ACTOR_API actorid_t actor_self(void);
-ACTOR_API void actor_tickupdate(void);
+ACTOR_API int actor_tickupdate(void);
 
 ACTOR_API int actor_status(actorid_t actor_id);
 ACTOR_API int actor_msgsize(actorid_t actor_id);
 ACTOR_API int actor_wait(actorid_t actor_id, unsigned int timeout);
+
+ACTOR_API int actor_shutdown(actorid_t actor_id);
+ACTOR_API int actor_receivable(actorid_t actor_id);
+ACTOR_API int actor_sendable(actorid_t actor_id);
 
 /* Return: -1 Failed. 0 Timedout. 1 Success. */
 ACTOR_API int actor_receive(actormsg_t *actor_msg, unsigned int timeout);
