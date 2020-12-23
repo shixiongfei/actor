@@ -303,7 +303,8 @@ int actor_gettid(void) {
 #elif defined(__NetBSD__)
   return _lwp_self();
 #else
-#error "Unable to get thread id."
+#warning "Unable to get thread id, use process id instead."
+  return actor_getpid();
 #endif
 }
 
