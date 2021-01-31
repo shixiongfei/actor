@@ -201,6 +201,36 @@ int sema_trywait(sema_t *sem) {
   return 0;
 }
 
+void rwlock_init(rwlock_t *lock) {
+  lock->write = 0;
+  lock->read = 0;
+}
+
+void rwlock_rlock(rwlock_t *lock) {
+  for (;;) {
+    while (lock->write)
+      atom_sync();
+
+    atom_incr(&lock->read);
+
+    if (!lock->write)
+      break;
+
+    atom_decr(&lock->read);
+  }
+}
+
+void rwlock_wlock(rwlock_t *lock) {
+  atom_spinlock(&lock->write);
+
+  while (lock->read)
+    atom_sync();
+}
+
+void rwlock_runlock(rwlock_t *lock) { atom_decr(&lock->read); }
+
+void rwlock_wunlock(rwlock_t *lock) { atom_spinunlock(&lock->write); }
+
 #ifndef _WIN32
 int tls_create(tls_t *tls) {
   return (0 == pthread_key_create(tls, NULL)) ? 0 : -1;

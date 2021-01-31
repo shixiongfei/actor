@@ -70,6 +70,11 @@ typedef struct sema_s {
   unsigned int value;
 } sema_t;
 
+typedef struct rwlock_s {
+  int write;
+  int read;
+} rwlock_t;
+
 typedef pthread_t thread_t;
 
 int mutex_create(mutex_t *mtx);
@@ -91,6 +96,12 @@ void sema_destroy(sema_t *sem);
 void sema_post(sema_t *sem);
 void sema_wait(sema_t *sem);
 int sema_trywait(sema_t *sem);
+
+void rwlock_init(rwlock_t *lock);
+void rwlock_rlock(rwlock_t *lock);
+void rwlock_wlock(rwlock_t *lock);
+void rwlock_runlock(rwlock_t *lock);
+void rwlock_wunlock(rwlock_t *lock);
 
 int tls_create(tls_t *tls);
 void tls_destroy(tls_t tls);
